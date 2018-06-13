@@ -189,6 +189,10 @@ def update_urdf(urdf, calibrated_params):
 
     unchanged_joints = [];
 
+    calibration_values = {}
+    xyz_values = {}
+    rpy_values = {}
+
     # update each transform (or joint calibration)
     for joint_name in calibrated_params.transforms.keys():
         link_updated = 0
@@ -197,6 +201,7 @@ def update_urdf(urdf, calibrated_params):
             if diff(updated_link_params[0:3],  urdf.joint_map[joint_name].origin.position):
                 print 'Updating xyz for', joint_name, '\n old:', urdf.joint_map[joint_name].origin.position, '\n new:', updated_link_params[0:3]
                 urdf.joint_map[joint_name].origin.position = updated_link_params[0:3]
+                xyz_values.update({joint_name: updated_link_params[0:3]})
                 link_updated = 1
             r1 = RPY_to_angle_axis(urdf.joint_map[joint_name].origin.rotation)
             if diff(r1, updated_link_params[3:6]):
@@ -215,7 +220,16 @@ def update_urdf(urdf, calibrated_params):
                     rot = angle_axis_to_RPY(updated_link_params[3:6])
                     print 'Updating rpy for', joint_name, '\n old:', urdf.joint_map[joint_name].origin.rotation, '\n new:', rot
                     urdf.joint_map[joint_name].origin.rotation = rot
+                    rpy_values.update({joint_name: updated_link_params[3:6]})
                     link_updated = 1                
+            if urdf.joint_map[joint_name].calibration != None:
+                cal = urdf.joint_map[joint_name].calibration
+                if cal.rising != None:
+                    calibration_values.update({joint_name: cal.rising})
+                if cal.falling != None:
+                    calibration_values.update({joint_name: cal.falling})
+                link_updated = 1
+
         except KeyError:
             print "Joint removed:", joint_name
             print ' xyz:', updated_link_params[0:3]
@@ -225,6 +239,11 @@ def update_urdf(urdf, calibrated_params):
             unchanged_joints.append( joint_name );
     
     print "The following joints weren't updated: \n", ', '.join(unchanged_joints)
+    out_f = open(output_dir + "/" + "calibration_values" + ".yaml", 'w')
+    yaml.dump({"transforms": {"xyz": xyz_values, "rpy":rpy_values}}, out_f)
+    yaml.dump({"calibration": calibration_values}, out_f, default_flow_style = False)
+    out_f.close()
+
     return urdf
 
 if __name__ == '__main__':
